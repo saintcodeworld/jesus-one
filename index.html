@@ -1045,42 +1045,27 @@
     // ============================================================
     //  POINTER LOCK
     // ============================================================
+    let hasEnteredOnce = false;
+
     blocker.addEventListener('click', () => {
       renderer.domElement.requestPointerLock();
     });
 
     document.addEventListener('pointerlockchange', () => {
       isLocked = document.pointerLockElement === renderer.domElement;
-      // Only show blocker if we lost pointer lock while document is still focused (not tab switching)
       if (isLocked) {
+        hasEnteredOnce = true;
         blocker.classList.add('hidden');
         crosshair.style.display = 'block';
-      } else if (document.hasFocus()) {
-        blocker.classList.remove('hidden');
+      } else {
         crosshair.style.display = 'none';
       }
     });
 
-    // Handle page visibility changes (tab switching)
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && !isLocked && document.hasFocus()) {
-        // When returning to the tab and pointer lock is lost, keep game running without blocker
-        blocker.classList.add('hidden');
-        crosshair.style.display = 'block';
-      }
-    });
-
-    // Handle window focus/blur events
-    window.addEventListener('blur', () => {
-      // When window loses focus, don't show blocker
-      // This prevents popup when switching tabs
-    });
-
-    window.addEventListener('focus', () => {
-      // When window regains focus, if we were playing, continue without blocker
-      if (!isLocked) {
-        blocker.classList.add('hidden');
-        crosshair.style.display = 'block';
+    // After first entry, clicking anywhere on the canvas re-locks silently
+    renderer.domElement.addEventListener('click', () => {
+      if (hasEnteredOnce && !isLocked) {
+        renderer.domElement.requestPointerLock();
       }
     });
 
