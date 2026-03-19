@@ -325,6 +325,20 @@ app.post('/api/admin-question', async (req, res) => {
 });
 
 // ============================================================
+// ADMIN CLEAR MESSAGES
+// ============================================================
+app.post('/api/admin-clear', (req, res) => {
+  const { password } = req.body;
+  
+  if (password !== CONFIG.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+  
+  broadcastToClients({ type: 'clear_messages' });
+  res.json({ success: true });
+});
+
+// ============================================================
 // MANUAL TEST ENDPOINT
 // ============================================================
 

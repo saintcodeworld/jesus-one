@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Divine Encounter</title>
+  <title>Talk to Jesus</title>
+  <link rel="icon" type="image/jpeg" href="image (16).jpg" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #e8e4f0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #b8b0c8; }
     canvas { display: block; }
 
     #blocker {
@@ -251,6 +252,13 @@
     let fakeLipSyncActive = false;
     let fakeLipSyncStart = 0;
 
+    // Arm gesture state (procedural body language while talking)
+    let gestureLeftUpperArm = null;
+    let gestureLeftForearm = null;
+    let gestureRightUpperArm = null;
+    let gestureRightForearm = null;
+    let gestureIntensity = 0;
+
     // ============================================================
     //  Renderer
     // ============================================================
@@ -259,7 +267,7 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Keep it slightly crunchy
     renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
+    renderer.toneMappingExposure = 0.65;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.body.appendChild(renderer.domElement);
 
@@ -267,7 +275,7 @@
     //  Scene & Fog
     // ============================================================
     const scene = new THREE.Scene();
-    const fogColor = new THREE.Color(0xf0ecf4); // soft white heavenly fog
+    const fogColor = new THREE.Color(0xc8c0d8); // muted heavenly fog
     scene.fog = new THREE.FogExp2(fogColor, CONFIG.FOG_DENSITY);
     scene.background = null; // we'll use a custom sky
 
@@ -289,9 +297,9 @@
       depthWrite: false,
       uniforms: {
         uTime: { value: 0 },
-        uTopColor:    { value: new THREE.Color(0xd8e8f8) }, // light blue-white zenith
-        uMidColor:    { value: new THREE.Color(0xf0eff8) }, // near-white mid sky
-        uBottomColor: { value: new THREE.Color(0xfaf8f0) }, // warm white horizon
+        uTopColor:    { value: new THREE.Color(0x8ea8c8) }, // muted blue zenith
+        uMidColor:    { value: new THREE.Color(0xb8b4c8) }, // soft lavender mid sky
+        uBottomColor: { value: new THREE.Color(0xd0c8b8) }, // warm muted horizon
         uFogColor:    { value: fogColor },
       },
       vertexShader: `
@@ -332,44 +340,44 @@
     //  LIGHTING — Heavenly / Divine
     // ============================================================
     // Ambient: bright white fill
-    const ambientLight = new THREE.AmbientLight(0xfff8f0, 1.2);
+    const ambientLight = new THREE.AmbientLight(0xe8e0d8, 0.6);
     scene.add(ambientLight);
 
     // Main directional: bright warm sunlight
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const dirLight = new THREE.DirectionalLight(0xfff8e8, 0.7);
     dirLight.position.set(-50, 300, -100);
     scene.add(dirLight);
 
     // Hemisphere: white sky → soft warm ground
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xf0e8d8, 0.9);
+    const hemiLight = new THREE.HemisphereLight(0xd8d0e0, 0xc8c0a8, 0.5);
     scene.add(hemiLight);
 
     // Ethereal point light behind figure (divine backlight glow)
-    const divineLight = new THREE.PointLight(0xfffff8, 3.5, 1200, 1.2);
+    const divineLight = new THREE.PointLight(0xfffff8, 1.8, 1200, 1.2);
     divineLight.position.set(figurePosition.x, 200, figurePosition.z - 50);
     scene.add(divineLight);
 
     // Strong halo point light at head level
-    const haloLight = new THREE.PointLight(0xfffff0, 4.0, 800, 1.0);
+    const haloLight = new THREE.PointLight(0xfffff0, 2.0, 800, 1.0);
     haloLight.position.set(figurePosition.x, CONFIG.FIGURE_SCALE * 0.65, figurePosition.z - 20);
     scene.add(haloLight);
 
     // Secondary halo rim light
-    const haloRimLight = new THREE.PointLight(0xe8d0f0, 2.5, 600, 1.5);
+    const haloRimLight = new THREE.PointLight(0xe8d0f0, 1.2, 600, 1.5);
     haloRimLight.position.set(figurePosition.x, CONFIG.FIGURE_SCALE * 0.7, figurePosition.z - 40);
     scene.add(haloRimLight);
 
     // Atmospheric glow lights across the field
-    const heavenGlow1 = new THREE.PointLight(0xfff8f0, 2.0, 600, 2);
+    const heavenGlow1 = new THREE.PointLight(0xfff8f0, 0.8, 600, 2);
     heavenGlow1.position.set(-150, 40, -100);
     scene.add(heavenGlow1);
 
-    const heavenGlow2 = new THREE.PointLight(0xfff0e8, 1.8, 500, 2);
+    const heavenGlow2 = new THREE.PointLight(0xfff0e8, 0.7, 500, 2);
     heavenGlow2.position.set(150, 30, -80);
     scene.add(heavenGlow2);
 
     // Soft ground-level light
-    const groundGlow = new THREE.PointLight(0xfff8e8, 1.0, 300, 2);
+    const groundGlow = new THREE.PointLight(0xfff8e8, 0.4, 300, 2);
     groundGlow.position.set(0, 2, 0);
     scene.add(groundGlow);
 
@@ -401,7 +409,7 @@
     grassTex.minFilter = THREE.NearestMipmapLinearFilter;
 
     const groundGeo = new THREE.PlaneGeometry(2000, 2000, 1, 1);
-    const groundMat = new THREE.MeshLambertMaterial({ map: grassTex, color: 0xf0e8dc });
+    const groundMat = new THREE.MeshLambertMaterial({ map: grassTex, color: 0xc8c0a8 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
@@ -414,7 +422,7 @@
     const fogPlaneMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.12,
       depthWrite: false,
     });
     const fogPlane = new THREE.Mesh(fogPlaneGeo, fogPlaneMat);
@@ -425,7 +433,7 @@
     // Secondary higher mist — white heavenly layer
     const fogPlane2 = new THREE.Mesh(
       new THREE.PlaneGeometry(2000, 2000, 1, 1),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06, depthWrite: false })
     );
     fogPlane2.rotation.x = -Math.PI / 2;
     fogPlane2.position.y = 8;
@@ -579,6 +587,59 @@
           }
         }
       });
+
+      // === ARM GESTURE — discover arm bones for body language ===
+      figureMesh.traverse((child) => {
+        if (!child.isBone) return;
+        const n = child.name.toLowerCase();
+        if (!gestureLeftUpperArm && (
+          n.includes('l_upperarm') || n.includes('leftupperarm') ||
+          n.includes('left_upper_arm') || n.includes('upperarm.l')
+        )) {
+          gestureLeftUpperArm = child;
+          console.log('[GESTURE] Left upper arm:', child.name);
+        }
+        if (!gestureLeftForearm && (
+          n.includes('l_forearm') || n.includes('leftforearm') ||
+          n.includes('left_forearm') || n.includes('forearm.l') ||
+          n.includes('leftlowerarm') || n.includes('lowerarm.l')
+        )) {
+          gestureLeftForearm = child;
+          console.log('[GESTURE] Left forearm:', child.name);
+        }
+        if (!gestureRightUpperArm && (
+          n.includes('r_upperarm') || n.includes('rightupperarm') ||
+          n.includes('right_upper_arm') || n.includes('upperarm.r')
+        )) {
+          gestureRightUpperArm = child;
+          console.log('[GESTURE] Right upper arm:', child.name);
+        }
+        if (!gestureRightForearm && (
+          n.includes('r_forearm') || n.includes('rightforearm') ||
+          n.includes('right_forearm') || n.includes('forearm.r') ||
+          n.includes('rightlowerarm') || n.includes('lowerarm.r')
+        )) {
+          gestureRightForearm = child;
+          console.log('[GESTURE] Right forearm:', child.name);
+        }
+      });
+
+      // Log all bones for debugging
+      figureMesh.traverse((child) => {
+        if (child.isBone) console.log('[GESTURE] Bone:', child.name);
+      });
+
+      // Log bone rest rotations for debugging axis conventions
+      for (const [key, bone] of [
+        ['leftUpperArm', gestureLeftUpperArm],
+        ['leftForearm', gestureLeftForearm],
+        ['rightUpperArm', gestureRightUpperArm],
+        ['rightForearm', gestureRightForearm],
+      ]) {
+        if (bone) {
+          console.log(`[GESTURE] ${key} rest rot: x=${bone.rotation.x.toFixed(3)} y=${bone.rotation.y.toFixed(3)} z=${bone.rotation.z.toFixed(3)}`);
+        }
+      }
 
       // Fallback: procedural mouth mesh
       if (!lsFoundMorph && !lsFoundBone) {
@@ -1360,6 +1421,79 @@
     }
 
     // ============================================================
+    //  ARM GESTURES — gentle hand raise while talking (wise preacher)
+    //  Uses quaternion slerp for rig-agnostic bone rotation.
+    //  Applies a LOCAL-SPACE bend on top of the bone's rest quaternion.
+    // ============================================================
+    let gestureRestQuats = {};    // key -> THREE.Quaternion (captured from model)
+    let gestureTargetQuats = {};  // key -> THREE.Quaternion (rest * offset)
+    let gestureCaptured = false;
+
+    function captureGestureRest() {
+      if (gestureCaptured) return;
+      const bones = [
+        ['leftForearm', gestureLeftForearm],
+        ['rightForearm', gestureRightForearm],
+        ['leftUpperArm', gestureLeftUpperArm],
+        ['rightUpperArm', gestureRightUpperArm],
+      ];
+      for (const [key, bone] of bones) {
+        if (bone) {
+          gestureRestQuats[key] = bone.quaternion.clone();
+        }
+      }
+      gestureCaptured = true;
+    }
+
+    // Smoothed intensity for blending
+    let gestureSmoothT = 0;
+
+    function updateArmGestures(delta, elapsed) {
+      const isTalking = lipSyncActive || fakeLipSyncActive;
+      const hasBones = gestureLeftForearm || gestureRightForearm ||
+                       gestureLeftUpperArm || gestureRightUpperArm;
+      if (!hasBones) return;
+
+      // Capture rest quaternions once (after first mixer tick)
+      captureGestureRest();
+
+      // Smoothly ramp intensity
+      const targetI = isTalking ? 1.0 : 0.0;
+      gestureIntensity += (targetI - gestureIntensity) * Math.min(1, delta * 2.0);
+      if (gestureIntensity < 0.001 && !isTalking) gestureIntensity = 0;
+      gestureSmoothT += (gestureIntensity - gestureSmoothT) * Math.min(1, delta * 2.5);
+
+      // Gentle sway
+      const sway = Math.sin(elapsed * 0.8) * 0.03 * gestureSmoothT;
+
+      // Helper: apply a local-axis rotation offset via quaternion slerp
+      const _q = new THREE.Quaternion();
+      const _offset = new THREE.Quaternion();
+
+      function driveBone(bone, key, axisX, axisY, axisZ) {
+        if (!bone || !gestureRestQuats[key]) return;
+        const rest = gestureRestQuats[key];
+        // Build offset quaternion from euler angles (local space)
+        _offset.setFromEuler(new THREE.Euler(axisX, axisY, axisZ, 'XYZ'));
+        // Target = rest * offset (applies offset in bone's local space)
+        _q.copy(rest).multiply(_offset);
+        // Slerp from rest toward target based on smoothed intensity
+        bone.quaternion.copy(rest).slerp(_q, gestureSmoothT);
+      }
+
+      // Forearms: bend at elbow using Z-axis (ValveBiped rig convention)
+      // Z is the elbow bend axis — negative Z curls the forearm inward/up
+      const forearmBend = 0.55 + sway;
+      driveBone(gestureLeftForearm, 'leftForearm', 0, 0, -forearmBend);
+      driveBone(gestureRightForearm, 'rightForearm', 0, 0, -forearmBend);
+
+      // Upper arms: bring forward slightly (Z-axis rotation)
+      const upperBend = 0.2 + sway * 0.5;
+      driveBone(gestureLeftUpperArm, 'leftUpperArm', 0, 0, -upperBend);
+      driveBone(gestureRightUpperArm, 'rightUpperArm', 0, 0, -upperBend);
+    }
+
+    // ============================================================
     //  RENDER LOOP
     // ============================================================
     function animate() {
@@ -1411,6 +1545,9 @@
 
       // --- Lip sync ---
       updateLipSync(delta);
+
+      // --- Arm gestures (body language while talking) ---
+      updateArmGestures(delta, elapsed);
 
       // --- HUD distance ---
       const dist = camera.position.distanceTo(figurePosition);
@@ -1509,6 +1646,8 @@
           const data = JSON.parse(evt.data);
           if (data.type === 'jesus_response') {
             addPumpFunResponse(data);
+          } else if (data.type === 'clear_messages') {
+            pfMessagesEl.innerHTML = '';
           }
         } catch (_) { /* ignore non-JSON */ }
       };
@@ -1545,8 +1684,10 @@
         pfMessagesEl.removeChild(pfMessagesEl.lastChild);
       }
 
-      // Always speak the response aloud
-      speakResponse(data.response).catch(() => {});
+      // First read the question aloud, then speak the answer
+      speakResponse(`${data.username} asks: ${data.question}`)
+        .then(() => speakResponse(data.response))
+        .catch(() => {});
     }
 
     function escHtml(str) {

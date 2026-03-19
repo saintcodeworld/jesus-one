@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Jesus Admin Panel</title>
+  <link rel="icon" type="image/jpeg" href="image (16).jpg" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
@@ -144,7 +145,10 @@
 
     <!-- Recent Questions -->
     <div class="mt-8 bg-black/40 backdrop-blur-lg rounded-2xl p-6 border border-amber-500/20">
-      <h2 class="text-xl font-semibold text-amber-300 mb-4">Recent Questions</h2>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-amber-300">Recent Questions</h2>
+        <button id="clear-history-btn" class="px-3 py-1 rounded-lg border border-red-500/30 text-red-400/80 text-sm hover:bg-red-500/10 transition-all">Clear History</button>
+      </div>
       <div id="recent-questions" class="space-y-3 max-h-64 overflow-y-auto">
         <p class="text-amber-200/50 text-sm">No questions submitted yet.</p>
       </div>
@@ -323,6 +327,20 @@
       form.reset();
       questionInput.focus();
     }
+
+    // Clear question history
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
+    clearHistoryBtn.addEventListener('click', async () => {
+      recentQuestionsList = [];
+      updateRecentQuestionsDisplay();
+      try {
+        await fetch('/api/admin-clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword }),
+        });
+      } catch (_) {}
+    });
 
     // Event listeners
     form.addEventListener('submit', submitQuestion);
