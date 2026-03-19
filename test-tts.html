@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TTS Test</title>
+</head>
+<body>
+    <h1>TTS Test</h1>
+    <button onclick="testTTS()">Test Jesus Voice</button>
+    <div id="status"></div>
+    
+    <script>
+        // Load config
+        async function loadConfig() {
+            const response = await fetch('/api/config');
+            return await response.json();
+        }
+        
+        async function testTTS() {
+            const status = document.getElementById('status');
+            status.innerHTML = 'Testing...';
+            
+            try {
+                const CONFIG = await loadConfig();
+                console.log('Config loaded:', CONFIG);
+                
+                // Test ElevenLabs
+                const url = `https://api.elevenlabs.io/v1/text-to-speech/${CONFIG.ELEVENLABS_VOICE_ID}`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'xi-api-key': CONFIG.ELEVENLABS_API_KEY,
+                    },
+                    body: JSON.stringify({
+                        text: "Peace be with you, my child. I am speaking through ElevenLabs.",
+                        model_id: 'eleven_multilingual_v2',
+                    }),
+                });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    status.innerHTML = `❌ ElevenLabs Error: ${error}`;
+                    console.error('ElevenLabs error:', error);
+                    return;
+                }
+                
+                const audioBuffer = await response.arrayBuffer();
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const audio = await audioCtx.decodeAudioData(audioBuffer);
+                
+                const source = audioCtx.createBufferSource();
+                source.buffer = audio;
+                source.connect(audioCtx.destination);
+                source.start();
+                
+                status.innerHTML = '✅ ElevenLabs TTS Working!';
+                
+            } catch (error) {
+                status.innerHTML = `❌ Error: ${error.message}`;
+                console.error('TTS error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

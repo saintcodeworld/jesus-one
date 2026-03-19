@@ -1,0 +1,3 @@
+Create a simple 128x128 icon using any image editor or online tool.
+Suggested: A golden cross or halo symbol on purple background.
+For now, you can use any PNG image as icon.png

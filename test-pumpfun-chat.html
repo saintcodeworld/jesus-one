@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Pump.fun Chat Extension</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: white; }
+        .chat-container { max-width: 600px; margin: 0 auto; }
+        .chat-message { 
+            background: #2a2a2a; 
+            padding: 12px; 
+            margin: 8px 0; 
+            border-radius: 8px; 
+            border-left: 3px solid #666;
+        }
+        .username { font-weight: bold; color: #00ff88; margin-bottom: 4px; }
+        .message-text { color: #ccc; }
+        .input-area { margin-top: 20px; }
+        input[type="text"] { 
+            width: 70%; 
+            padding: 8px; 
+            background: #333; 
+            border: 1px solid #555; 
+            color: white; 
+            border-radius: 4px; 
+        }
+        button { 
+            padding: 8px 16px; 
+            background: #00ff88; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin-left: 10px; 
+        }
+        .instructions { 
+            background: #333; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            border-left: 4px solid #00ff88; 
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">
+        <h2>🧪 Test Your Jesus Extension</h2>
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Make sure your Jesus extension is loaded in Chrome</li>
+            <li>Type messages starting with "jesus " below</li>
+            <li>Check the browser console (F12) for extension logs</li>
+            <li>Watch for Jesus responses in your main web interface</li>
+        </ol>
+        <p><strong>Example:</strong> "jesus do you love me?"</p>
+    </div>
+
+    <div class="chat-container" data-testid="chat-container">
+        <h3>💬 Simulated Pump.fun Chat</h3>
+        <div id="messages"></div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="messageInput" placeholder="Type your message (start with 'jesus ' to trigger)">
+        <button onclick="sendMessage()">Send Message</button>
+    </div>
+
+    <script>
+        let messageCount = 0;
+        const usernames = ['Alice', 'Bob', 'Charlie', 'David', 'Eve'];
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            
+            if (!text) return;
+            
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message';
+            messageDiv.setAttribute('data-testid', 'chat-message');
+            
+            const username = usernames[messageCount % usernames.length];
+            messageDiv.innerHTML = `
+                <div class="username">${username}</div>
+                <div class="message-text">${text}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            
+            // Clear input
+            input.value = '';
+            messageCount++;
+            
+            // Scroll to bottom
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            console.log(`Message sent: ${username}: ${text}`);
+        }
+        
+        // Allow Enter key to send
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Add some initial messages
+        const initialMessages = [
+            { user: 'Alice', text: 'Hey everyone!' },
+            { user: 'Bob', text: 'How\'s the trading going?' },
+            { user: 'Charlie', text: 'jesus what is the meaning of life?' }
+        ];
+        
+        initialMessages.forEach(msg => {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message';
+            messageDiv.setAttribute('data-testid', 'chat-message');
+            
+            messageDiv.innerHTML = `
+                <div class="username">${msg.user}</div>
+                <div class="message-text">${msg.text}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messageCount++;
+        });
+    </script>
+</body>
+</html>

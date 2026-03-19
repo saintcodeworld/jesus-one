@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Divine Encounter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #e8e4f0; }
+    canvas { display: block; }
+
+    #blocker {
+      position: fixed; inset: 0; z-index: 100;
+      background: radial-gradient(ellipse at center, rgba(220,230,245,0.9) 0%, rgba(200,210,235,0.97) 100%);
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      cursor: pointer; transition: opacity 0.8s;
+    }
+    #blocker.hidden { opacity: 0; pointer-events: none; }
+
+    #crosshair {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 4px; height: 4px; background: rgba(255,255,255,0.35);
+      border-radius: 50%; z-index: 10; pointer-events: none;
+    }
+
+
+    #subtitles {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 50; max-width: 80vw; text-align: center;
+      transition: opacity 0.5s;
+    }
+    #subtitles.hidden { opacity: 0; }
+
+
+    #hud-distance {
+      position: fixed; top: 20px; right: 20px; z-index: 30;
+      font-family: 'Courier New', monospace; font-size: 12px;
+      color: rgba(200,180,220,0.5); pointer-events: none;
+    }
+
+    /* PS1-style scanlines overlay */
+    #scanlines {
+      position: fixed; inset: 0; z-index: 9; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+    }
+
+    /* Vignette */
+    #vignette {
+      position: fixed; inset: 0; z-index: 8; pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(220,220,240,0.3) 100%);
+    }
+
+    /* Loading spinner */
+    #apostle-chat {
+      position: fixed; top: 20px; left: 20px; z-index: 30;
+      max-width: 320px; pointer-events: none;
+    }
+    .apostle-msg {
+      background: rgba(255,248,220,0.85); backdrop-filter: blur(4px);
+      border: 1px solid rgba(218,185,107,0.4); border-radius: 12px;
+      padding: 8px 14px; margin-bottom: 8px; font-size: 13px;
+      color: #3a2f1a; font-family: Georgia, serif;
+      animation: msgFade 6s ease-in-out forwards;
+      box-shadow: 0 2px 12px rgba(180,150,80,0.15);
+    }
+    .apostle-msg .name { font-weight: bold; color: #8b6914; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    @keyframes msgFade {
+      0% { opacity: 0; transform: translateY(10px); }
+      8% { opacity: 1; transform: translateY(0); }
+      75% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-5px); }
+    }
+
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid rgba(200,180,255,0.3);
+      border-top-color: rgba(200,180,255,0.9); border-radius: 50%;
+      animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { text-shadow: 0 0 10px rgba(255,230,150,0.5); }
+      50% { text-shadow: 0 0 25px rgba(255,230,150,0.9), 0 0 50px rgba(255,200,80,0.4); }
+    }
+
+    .float-anim { animation: float 3s ease-in-out infinite; }
+    .pulse-text { animation: pulse-glow 2s ease-in-out infinite; }
+
+    /* Pump.fun Live Chat Panel */
+    #pumpfun-chat {
+      position: fixed; top: 20px; right: 60px; z-index: 30;
+      width: 360px; max-height: 480px; overflow-y: auto;
+      background: rgba(15, 8, 30, 0.88); backdrop-filter: blur(10px);
+      border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px;
+      padding: 14px 16px; font-family: 'Segoe UI', system-ui, sans-serif;
+      box-shadow: 0 4px 24px rgba(139, 92, 246, 0.15);
+      pointer-events: none;
+    }
+    #pumpfun-header {
+      display: flex; align-items: center; gap: 8px;
+      color: #c4b5fd; font-size: 12px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.18);
+      padding-bottom: 10px; margin-bottom: 10px;
+    }
+    #pumpfun-header .live-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #10b981;
+      animation: livePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+      50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+    }
+    #pumpfun-status {
+      font-size: 11px; padding: 5px 10px; border-radius: 6px;
+      text-align: center; margin-bottom: 8px;
+    }
+    .pf-msg {
+      margin-bottom: 12px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(88, 28, 135, 0.18); border-left: 3px solid #a78bfa;
+      animation: pfSlide 0.4s ease-out;
+    }
+    .pf-user { color: #a78bfa; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pf-q { color: #e9d5ff; font-size: 13px; margin-top: 4px; }
+    .pf-a {
+      color: #fef3c7; font-size: 13px; font-style: italic;
+      margin-top: 8px; padding: 8px 10px;
+      background: rgba(217, 119, 6, 0.1); border-radius: 6px;
+      border-left: 2px solid #fbbf24;
+    }
+    @keyframes pfSlide {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    #pumpfun-chat::-webkit-scrollbar { width: 5px; }
+    #pumpfun-chat::-webkit-scrollbar-track { background: rgba(88,28,135,0.15); border-radius: 3px; }
+    #pumpfun-chat::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.35); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <!-- Start Screen / Pointer Lock Blocker -->
+  <div id="blocker">
+    <div class="text-center float-anim">
+      <div class="text-amber-700/70 text-sm tracking-[0.3em] uppercase mb-4 font-light">The Kingdom of Heaven</div>
+      <h1 class="text-5xl font-thin text-amber-800/80 mb-6 tracking-wider pulse-text">DIVINE ENCOUNTER</h1>
+      <p class="text-amber-700/50 text-sm tracking-wide">Click anywhere to enter</p>
+      <p class="text-amber-600/40 text-xs mt-3 tracking-wide">WASD to move · Mouse to look · Space to fly up · Shift to fly down</p>
+    </div>
+  </div>
+
+  <!-- Apostle Chat -->
+  <div id="apostle-chat"></div>
+
+  <!-- Pump.fun Live Chat Panel -->
+  <div id="pumpfun-chat">
+    <div id="pumpfun-header">
+      <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMS45IDguN0wxNi4xNCAxMy40NkwxOC4yNyAyMUwxMiAxNy4yN0w1LjczIDIxTDcuODYgMTMuNDZMMiA4LjdMMTAuOTEgOC4yNkwxMiAyWiIgZmlsbD0iI0ZCRjI0Ii8+Cjwvc3ZnPgo=" alt="Pump.fun" style="width: 16px; height: 16px; margin-right: 8px;">
+      <span class="live-dot"></span>
+      <span>Pump.fun Live Chat Questions</span>
+    </div>
+    <div id="pumpfun-status" style="color:#fbbf24;">Connecting to server…</div>
+    <div id="pumpfun-messages"></div>
+  </div>
+
+  <!-- HUD -->
+  <div id="crosshair"></div>
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+  <div id="hud-distance"></div>
+
+  <!-- Subtitles -->
+  <div id="subtitles" class="hidden">
+    <div class="bg-black/50 backdrop-blur-sm rounded-lg px-6 py-3 border border-purple-500/10">
+      <p id="subtitle-text" class="text-purple-100/90 text-base font-light tracking-wide leading-relaxed"></p>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script src="env-loader.js"></script>
+  <script src="config.js"></script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // ============================================================
+    //  BOOT — hydrate config from .env before anything runs
+    // ============================================================
+    await hydrateConfig();
+    console.log('[CONFIG] OpenAI key loaded:', CONFIG.OPENAI_API_KEY ? 'YES' : 'NO');
+    console.log('[CONFIG] TTS Provider:', CONFIG.TTS_PROVIDER);
+    console.log('[CONFIG] ElevenLabs key loaded:', CONFIG.ELEVENLABS_API_KEY ? 'YES' : 'NO');
+
+    // ============================================================
+    //  DOM refs
+    // ============================================================
+    const blocker        = document.getElementById('blocker');
+    const crosshair      = document.getElementById('crosshair');
+    const subtitlesEl    = document.getElementById('subtitles');
+    const subtitleText   = document.getElementById('subtitle-text');
+    const hudDistance     = document.getElementById('hud-distance');
+
+    // ============================================================
+    //  State
+    // ============================================================
+    let isLocked = false;
+    const moveState = { forward: false, backward: false, left: false, right: false, flyUp: false, flyDown: false };
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const clock = new THREE.Clock();
+    const MOVE_SPEED = 45;
+    const FLY_SPEED = 30;
+    const MIN_HEIGHT = 5;
+    const MAX_HEIGHT = 300;
+    const MOUSE_SENSITIVITY = 0.002;
+    let figurePosition = new THREE.Vector3(0, 0, -CONFIG.FIGURE_DISTANCE);
+    const HALO_COLOR = 0xfffde0; // warm divine gold-white
+    const apostleChatEl = document.getElementById('apostle-chat');
+
+    // Lip-sync state
+    let lipSyncActive = false;
+    let lipSyncAnalyser = null;
+    let lipSyncDataArray = null;
+    let lipSyncMorphMesh = null;
+    let lipSyncMorphIndex = null;
+    let lipSyncJawBone = null;
+    let lipSyncJawRestX = 0;
+    let lipSyncProceduralMouth = null;
+    let mouthOpenAmount = 0;
+    let fakeLipSyncActive = false;
+    let fakeLipSyncStart = 0;
+
+    // ============================================================
+    //  Renderer
+    // ============================================================
+    const renderer = new THREE.WebGLRenderer({ antialias: false }); // PS1 = no AA
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Keep it slightly crunchy
+    renderer.shadowMap.enabled = false;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.9;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
+
+    // ============================================================
+    //  Scene & Fog
+    // ============================================================
+    const scene = new THREE.Scene();
+    const fogColor = new THREE.Color(0xf0ecf4); // soft white heavenly fog
+    scene.fog = new THREE.FogExp2(fogColor, CONFIG.FOG_DENSITY);
+    scene.background = null; // we'll use a custom sky
+
+    // ============================================================
+    //  Camera
+    // ============================================================
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 2000);
+    camera.position.set(0, 12, 0);
+    camera.rotation.order = 'YXZ';
+    // Start looking toward Jesus
+    camera.lookAt(figurePosition.x, 40, figurePosition.z);
+
+    // ============================================================
+    //  SKY — Heavenly golden/blue gradient dome
+    // ============================================================
+    const skyGeo = new THREE.SphereGeometry(900, 32, 32);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uTopColor:    { value: new THREE.Color(0xd8e8f8) }, // light blue-white zenith
+        uMidColor:    { value: new THREE.Color(0xf0eff8) }, // near-white mid sky
+        uBottomColor: { value: new THREE.Color(0xfaf8f0) }, // warm white horizon
+        uFogColor:    { value: fogColor },
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uTopColor;
+        uniform vec3 uMidColor;
+        uniform vec3 uBottomColor;
+        uniform vec3 uFogColor;
+        uniform float uTime;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y;
+          float t = h * 0.5 + 0.5;
+          vec3 col;
+          if (t > 0.55) {
+            col = mix(uMidColor, uTopColor, smoothstep(0.55, 1.0, t));
+          } else if (t > 0.35) {
+            col = mix(uBottomColor, uMidColor, smoothstep(0.35, 0.55, t));
+          } else {
+            col = mix(uFogColor, uBottomColor, smoothstep(0.0, 0.35, t));
+          }
+          col += 0.012 * sin(uTime * 0.08 + t * 5.0);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(sky);
+
+    // ============================================================
+    //  LIGHTING — Heavenly / Divine
+    // ============================================================
+    // Ambient: bright white fill
+    const ambientLight = new THREE.AmbientLight(0xfff8f0, 1.2);
+    scene.add(ambientLight);
+
+    // Main directional: bright warm sunlight
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(-50, 300, -100);
+    scene.add(dirLight);
+
+    // Hemisphere: white sky → soft warm ground
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xf0e8d8, 0.9);
+    scene.add(hemiLight);
+
+    // Ethereal point light behind figure (divine backlight glow)
+    const divineLight = new THREE.PointLight(0xfffff8, 3.5, 1200, 1.2);
+    divineLight.position.set(figurePosition.x, 200, figurePosition.z - 50);
+    scene.add(divineLight);
+
+    // Strong halo point light at head level
+    const haloLight = new THREE.PointLight(0xfffff0, 4.0, 800, 1.0);
+    haloLight.position.set(figurePosition.x, CONFIG.FIGURE_SCALE * 0.65, figurePosition.z - 20);
+    scene.add(haloLight);
+
+    // Secondary halo rim light
+    const haloRimLight = new THREE.PointLight(0xe8d0f0, 2.5, 600, 1.5);
+    haloRimLight.position.set(figurePosition.x, CONFIG.FIGURE_SCALE * 0.7, figurePosition.z - 40);
+    scene.add(haloRimLight);
+
+    // Atmospheric glow lights across the field
+    const heavenGlow1 = new THREE.PointLight(0xfff8f0, 2.0, 600, 2);
+    heavenGlow1.position.set(-150, 40, -100);
+    scene.add(heavenGlow1);
+
+    const heavenGlow2 = new THREE.PointLight(0xfff0e8, 1.8, 500, 2);
+    heavenGlow2.position.set(150, 30, -80);
+    scene.add(heavenGlow2);
+
+    // Soft ground-level light
+    const groundGlow = new THREE.PointLight(0xfff8e8, 1.0, 300, 2);
+    groundGlow.position.set(0, 2, 0);
+    scene.add(groundGlow);
+
+    // ============================================================
+    //  GROUND — Heavenly lush grass field
+    // ============================================================
+    const grassCanvas = document.createElement('canvas');
+    grassCanvas.width = 512;
+    grassCanvas.height = 512;
+    const gctx = grassCanvas.getContext('2d');
+    // Light heavenly white-gold base
+    gctx.fillStyle = '#e8e0d0';
+    gctx.fillRect(0, 0, 512, 512);
+    // Soft cloud-like ground texture with warm whites
+    for (let i = 0; i < 25000; i++) {
+      const x = Math.random() * 512;
+      const y = Math.random() * 512;
+      const base = 200 + Math.random() * 50;
+      const r = base + Math.random() * 10;
+      const g = base - 5 + Math.random() * 10;
+      const b = base - 15 + Math.random() * 10;
+      gctx.fillStyle = `rgba(${Math.min(255,r)}, ${Math.min(255,g)}, ${Math.min(255,b)}, ${0.3 + Math.random() * 0.5})`;
+      gctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 4);
+    }
+    const grassTex = new THREE.CanvasTexture(grassCanvas);
+    grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+    grassTex.repeat.set(80, 80);
+    grassTex.magFilter = THREE.NearestFilter;
+    grassTex.minFilter = THREE.NearestMipmapLinearFilter;
+
+    const groundGeo = new THREE.PlaneGeometry(2000, 2000, 1, 1);
+    const groundMat = new THREE.MeshLambertMaterial({ map: grassTex, color: 0xf0e8dc });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    scene.add(ground);
+
+    // ============================================================
+    //  FOG PLANE — Golden/white heavenly mist
+    // ============================================================
+    const fogPlaneGeo = new THREE.PlaneGeometry(2000, 2000, 1, 1);
+    const fogPlaneMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false,
+    });
+    const fogPlane = new THREE.Mesh(fogPlaneGeo, fogPlaneMat);
+    fogPlane.rotation.x = -Math.PI / 2;
+    fogPlane.position.y = 3;
+    scene.add(fogPlane);
+
+    // Secondary higher mist — white heavenly layer
+    const fogPlane2 = new THREE.Mesh(
+      new THREE.PlaneGeometry(2000, 2000, 1, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, depthWrite: false })
+    );
+    fogPlane2.rotation.x = -Math.PI / 2;
+    fogPlane2.position.y = 8;
+    scene.add(fogPlane2);
+
+    // ============================================================
+    //  CLOUDS — Floating cloud platforms scattered around heaven
+    // ============================================================
+    const cloudGroup = new THREE.Group();
+    scene.add(cloudGroup);
+
+    function createCloud(x, y, z, scale) {
+      const cloud = new THREE.Group();
+      const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+      // Several merged spheres to form a cloud
+      const sizes = [
+        { r: 8, ox: 0, oy: 0, oz: 0 },
+        { r: 10, ox: 7, oy: 1, oz: 2 },
+        { r: 7, ox: -6, oy: -1, oz: 1 },
+        { r: 9, ox: 4, oy: 3, oz: -3 },
+        { r: 6, ox: -4, oy: 2, oz: -2 },
+        { r: 11, ox: 2, oy: -1, oz: 0 },
+        { r: 5, ox: 10, oy: -1, oz: 1 },
+        { r: 7, ox: -9, oy: 0, oz: -1 },
+      ];
+      sizes.forEach(s => {
+        const geo = new THREE.SphereGeometry(s.r, 8, 6);
+        const m = new THREE.Mesh(geo, cloudMat);
+        m.position.set(s.ox, s.oy, s.oz);
+        cloud.add(m);
+      });
+      cloud.position.set(x, y, z);
+      cloud.scale.setScalar(scale);
+      cloud.userData.baseY = y;
+      cloud.userData.phase = Math.random() * Math.PI * 2;
+      cloudGroup.add(cloud);
+      return cloud;
+    }
+
+    // High floating clouds in the sky
+    createCloud(-80, 85, -60, 1.8);
+    createCloud(100, 95, -120, 2.2);
+    createCloud(-150, 70, -200, 2.0);
+    createCloud(60, 110, -250, 2.5);
+    createCloud(-200, 80, -80, 1.6);
+    createCloud(180, 90, -180, 1.9);
+    createCloud(-40, 120, -300, 2.8);
+    createCloud(130, 75, 30, 1.7);
+    createCloud(-120, 100, 50, 2.1);
+    createCloud(200, 130, -350, 2.4);
+    createCloud(-250, 88, -150, 2.2);
+    createCloud(0, 140, -400, 3.0);
+    createCloud(-180, 95, -100, 2.0);
+    createCloud(220, 78, -220, 1.8);
+    createCloud(-90, 115, 20, 2.3);
+    createCloud(150, 82, -50, 1.9);
+    createCloud(-50, 105, -280, 2.6);
+    createCloud(80, 92, 40, 1.7);
+
+    // ============================================================
+    //  MOUNTAINS — Background mountain ranges like the reference
+    // ============================================================
+    function createMountainRange(zPos, height, width, segments, color, opacity) {
+      const shape = new THREE.Shape();
+      const step = width / segments;
+      shape.moveTo(-width / 2, 0);
+      for (let i = 0; i <= segments; i++) {
+        const x = -width / 2 + i * step;
+        const peak = Math.sin(i * 0.8) * height * 0.6 + Math.sin(i * 1.7 + 3) * height * 0.3 + Math.cos(i * 0.3) * height * 0.2;
+        const y = Math.max(5, peak + height * 0.3);
+        shape.lineTo(x, y);
+      }
+      shape.lineTo(width / 2, 0);
+      shape.lineTo(-width / 2, 0);
+
+      const extrudeSettings = { depth: 30, bevelEnabled: false };
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      const mat = new THREE.MeshLambertMaterial({
+        color: color,
+        transparent: opacity < 1,
+        opacity: opacity,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(0, 0, zPos);
+      return mesh;
+    }
+
+    // Far mountains (most faded, light white-blue)
+    const mtFar = createMountainRange(-800, 120, 2000, 30, 0xddd8e8, 0.5);
+    scene.add(mtFar);
+
+    // Mid mountains (medium fade, soft lavender-white)
+    const mtMid = createMountainRange(-600, 90, 1800, 25, 0xd0cce0, 0.6);
+    scene.add(mtMid);
+
+    // Near mountains (least faded, light purple-white)
+    const mtNear = createMountainRange(-450, 65, 1600, 20, 0xc8c4d8, 0.7);
+    scene.add(mtNear);
+
+    // ============================================================
+    //  3D JESUS FIGURE — Loaded from jesus.glb
+    // ============================================================
+    let figureMesh;
+    let jesusAnimMixer = null;
+    const haloGroup = new THREE.Group();
+    scene.add(haloGroup);
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('jesus.glb', (gltf) => {
+      figureMesh = gltf.scene;
+
+      // Compute bounding box to determine model's natural size
+      const box = new THREE.Box3().setFromObject(figureMesh);
+      const modelHeight = box.max.y - box.min.y;
+      const desiredHeight = CONFIG.FIGURE_SCALE;
+      const scaleFactor = desiredHeight / (modelHeight || 1);
+      figureMesh.scale.setScalar(scaleFactor);
+
+      // Center the model on the ground at figurePosition
+      const scaledBox = new THREE.Box3().setFromObject(figureMesh);
+      const offsetY = -scaledBox.min.y; // push feet to y=0
+      figureMesh.position.set(figurePosition.x, offsetY, figurePosition.z);
+
+      scene.add(figureMesh);
+
+      // === LIP SYNC — detect morph targets / jaw bone / create procedural mouth ===
+      let lsFoundMorph = false;
+      let lsFoundBone = false;
+
+      figureMesh.traverse((child) => {
+        if (child.isMesh && child.morphTargetDictionary && !lsFoundMorph) {
+          console.log('[LIP SYNC] Morph targets on', child.name, ':', Object.keys(child.morphTargetDictionary));
+          const mouthKeys = ['mouthOpen', 'jawOpen', 'viseme_aa', 'viseme_O', 'Jaw_Open', 'mouth_open', 'A', 'aa', 'jawForward'];
+          for (const key of mouthKeys) {
+            if (key in child.morphTargetDictionary) {
+              lipSyncMorphMesh = child;
+              lipSyncMorphIndex = child.morphTargetDictionary[key];
+              lsFoundMorph = true;
+              console.log('[LIP SYNC] Using morph target:', key, 'on mesh:', child.name);
+              break;
+            }
+          }
+        }
+        if (child.isBone && !lsFoundBone && !lsFoundMorph) {
+          const n = child.name.toLowerCase();
+          if (n.includes('jaw') || n.includes('chin')) {
+            lipSyncJawBone = child;
+            lipSyncJawRestX = child.rotation.x;
+            lsFoundBone = true;
+            console.log('[LIP SYNC] Using jaw bone:', child.name);
+          }
+        }
+      });
+
+      // Fallback: procedural mouth mesh
+      if (!lsFoundMorph && !lsFoundBone) {
+        console.log('[LIP SYNC] No morph/bone found — creating procedural mouth');
+        const origMinY = scaledBox.min.y / scaleFactor;
+        const origMaxY = scaledBox.max.y / scaleFactor;
+        const origH = origMaxY - origMinY;
+        const origMaxZ = scaledBox.max.z / scaleFactor;
+
+        const mouthRadius = origH * 0.012;
+        const mouthGeo = new THREE.CircleGeometry(mouthRadius, 16);
+        const mouthMat = new THREE.MeshBasicMaterial({
+          color: 0x1a0800,
+          side: THREE.DoubleSide,
+          depthTest: true,
+          transparent: true,
+          opacity: 0.0,
+        });
+        lipSyncProceduralMouth = new THREE.Mesh(mouthGeo, mouthMat);
+        const mouthY = origMinY + origH * 0.73;
+        const mouthZ = origMaxZ + mouthRadius * 0.5;
+        lipSyncProceduralMouth.position.set(0, mouthY, mouthZ);
+        lipSyncProceduralMouth.scale.set(1, 0.01, 1);
+        figureMesh.add(lipSyncProceduralMouth);
+        console.log('[LIP SYNC] Procedural mouth at local Y:', mouthY.toFixed(2), 'Z:', mouthZ.toFixed(2));
+      }
+
+      // If the GLB has animations, play the first one
+      if (gltf.animations && gltf.animations.length > 0) {
+        jesusAnimMixer = new THREE.AnimationMixer(figureMesh);
+        const action = jesusAnimMixer.clipAction(gltf.animations[0]);
+        action.play();
+      }
+
+      // === HALO — positioned at the model's head ===
+      const headY = scaledBox.max.y * 0.92 + offsetY;
+      const haloZ = figurePosition.z - desiredHeight * 0.02;
+
+      function createHaloTexture(innerRadius, outerRadius, color, alpha) {
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 512;
+        const ctx = c.getContext('2d');
+        const cx = 256, cy = 256;
+        const gradient = ctx.createRadialGradient(cx, cy, innerRadius * 256, cx, cy, outerRadius * 256);
+        gradient.addColorStop(0, `rgba(${color[0]},${color[1]},${color[2]},${alpha})`);
+        gradient.addColorStop(0.4, `rgba(${color[0]},${color[1]},${color[2]},${alpha * 0.6})`);
+        gradient.addColorStop(0.7, `rgba(${color[0]},${color[1]},${color[2]},${alpha * 0.2})`);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 512, 512);
+        const tex = new THREE.CanvasTexture(c);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      const haloSize = desiredHeight * 0.15;
+
+      const haloCore = new THREE.Mesh(
+        new THREE.PlaneGeometry(haloSize * 1.2, haloSize * 1.2),
+        new THREE.MeshBasicMaterial({
+          map: createHaloTexture(0.0, 0.5, [255, 255, 240], 1.0),
+          transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+        })
+      );
+      haloCore.position.set(figurePosition.x, headY, haloZ - 2);
+      haloGroup.add(haloCore);
+
+      const haloOuter = new THREE.Mesh(
+        new THREE.PlaneGeometry(haloSize * 2.5, haloSize * 2.5),
+        new THREE.MeshBasicMaterial({
+          map: createHaloTexture(0.0, 0.8, [255, 248, 220], 0.5),
+          transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+        })
+      );
+      haloOuter.position.set(figurePosition.x, headY, haloZ - 5);
+      haloGroup.add(haloOuter);
+
+      console.log('[JESUS GLB] Loaded. Height:', modelHeight.toFixed(1), '→ scaled to', desiredHeight, '| Animations:', gltf.animations.length);
+    },
+    (progress) => {
+      if (progress.total) console.log('[JESUS GLB] Loading:', Math.round(progress.loaded / progress.total * 100) + '%');
+    },
+    (err) => {
+      console.error('[JESUS GLB] Failed to load jesus.glb:', err);
+    });
+
+    // ============================================================
+    //  GRASS BLADES — Instanced low-poly tufts
+    // ============================================================
+    const bladeGeo = new THREE.ConeGeometry(0.3, 3, 3);
+    const bladeMat = new THREE.MeshLambertMaterial({ color: 0xe0d8c8, transparent: true, opacity: 0.5 });
+    const bladeCount = 3000;
+    const bladeInstanced = new THREE.InstancedMesh(bladeGeo, bladeMat, bladeCount);
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < bladeCount; i++) {
+      dummy.position.set(
+        (Math.random() - 0.5) * 600,
+        1.2 + Math.random() * 0.5,
+        (Math.random() - 0.5) * 600
+      );
+      dummy.rotation.set(
+        (Math.random() - 0.5) * 0.3,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.3
+      );
+      dummy.scale.set(
+        0.5 + Math.random() * 0.8,
+        0.5 + Math.random() * 1.2,
+        0.5 + Math.random() * 0.8
+      );
+      dummy.updateMatrix();
+      bladeInstanced.setMatrixAt(i, dummy.matrix);
+    }
+    scene.add(bladeInstanced);
+
+    // ============================================================
+    //  PARTICLES — Floating ethereal motes
+    // ============================================================
+    const particleCount = 200;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      particlePositions[i * 3]     = (Math.random() - 0.5) * 400;
+      particlePositions[i * 3 + 1] = 5 + Math.random() * 40;
+      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 400;
+    }
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    const particleMat = new THREE.PointsMaterial({
+      color: 0xfff8e0,
+      size: 2.0,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    const particles = new THREE.Points(particleGeo, particleMat);
+    scene.add(particles);
+
+    // ============================================================
+    //  APOSTLES — 12 disciples walking and talking in heaven
+    // ============================================================
+    const APOSTLE_NAMES = [
+      'Peter', 'Andrew', 'James', 'John', 'Philip', 'Bartholomew',
+      'Matthew', 'Thomas', 'James A.', 'Thaddaeus', 'Simon', 'Judas T.'
+    ];
+    const ROBE_COLORS = [
+      0xc8a882, 0xb8956e, 0xd4b896, 0xa88c6a, 0xbfa078, 0xc9a47a,
+      0xdbc4a0, 0xb09070, 0xc4a080, 0xd0b090, 0xb8a078, 0xcbb898
+    ];
+    const APOSTLE_CONVERSATIONS = [
+      { a: 0, b: 1, lines: [
+        { who: 0, text: 'Do you remember the storm on the sea, Andrew?' },
+        { who: 1, text: 'How could I forget? He calmed it with a word.' },
+        { who: 0, text: 'That was when I truly understood His power.' },
+      ]},
+      { a: 2, b: 3, lines: [
+        { who: 2, text: 'John, what do you think He meant by living water?' },
+        { who: 3, text: 'I believe it is the Spirit itself, flowing eternally.' },
+        { who: 2, text: 'Everything He says carries layers of truth.' },
+      ]},
+      { a: 4, b: 5, lines: [
+        { who: 4, text: 'The loaves and fishes... five thousand fed.' },
+        { who: 5, text: 'And twelve baskets remained. One for each of us.' },
+        { who: 4, text: 'A sign we shall never go hungry in spirit.' },
+      ]},
+      { a: 6, b: 7, lines: [
+        { who: 6, text: 'Thomas, do you still wonder about things?' },
+        { who: 7, text: 'I wonder at everything. Doubt leads me to deeper faith.' },
+        { who: 6, text: 'Perhaps that is why He chose you.' },
+      ]},
+      { a: 8, b: 9, lines: [
+        { who: 8, text: 'The light here... it never fades.' },
+        { who: 9, text: 'Because it comes from within, not from above.' },
+        { who: 8, text: 'Eternal dawn. I could walk forever.' },
+      ]},
+      { a: 10, b: 11, lines: [
+        { who: 10, text: 'Have you spoken with the Master today?' },
+        { who: 11, text: 'His presence speaks even in silence.' },
+        { who: 10, text: 'True. Words are merely shadows of His light.' },
+      ]},
+    ];
+
+    const apostles = [];
+
+    function createApostleMesh(robeColor) {
+      const group = new THREE.Group();
+
+      // Head
+      const headGeo = new THREE.SphereGeometry(1.2, 8, 6);
+      const skinMat = new THREE.MeshLambertMaterial({ color: 0xd4a574 });
+      const head = new THREE.Mesh(headGeo, skinMat);
+      head.position.y = 8.5;
+      group.add(head);
+
+      // Hair
+      const hairGeo = new THREE.SphereGeometry(1.35, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.6);
+      const hairMat = new THREE.MeshLambertMaterial({ color: 0x3a2a1a });
+      const hair = new THREE.Mesh(hairGeo, hairMat);
+      hair.position.y = 8.8;
+      group.add(hair);
+
+      // Beard
+      const beardGeo = new THREE.SphereGeometry(0.7, 6, 4, 0, Math.PI * 2, Math.PI * 0.4, Math.PI * 0.5);
+      const beardMat = new THREE.MeshLambertMaterial({ color: 0x3a2a1a });
+      const beard = new THREE.Mesh(beardGeo, beardMat);
+      beard.position.set(0, 7.8, 0.5);
+      group.add(beard);
+
+      // Body / Robe
+      const robeGeo = new THREE.CylinderGeometry(1.2, 2.2, 7, 8);
+      const robeMat = new THREE.MeshLambertMaterial({ color: robeColor });
+      const robe = new THREE.Mesh(robeGeo, robeMat);
+      robe.position.y = 4;
+      group.add(robe);
+
+      // Arms
+      const armGeo = new THREE.CylinderGeometry(0.35, 0.3, 4, 6);
+      const armMat = new THREE.MeshLambertMaterial({ color: robeColor });
+      const leftArm = new THREE.Mesh(armGeo, armMat);
+      leftArm.position.set(-1.8, 5, 0);
+      leftArm.rotation.z = 0.2;
+      group.add(leftArm);
+
+      const rightArm = new THREE.Mesh(armGeo, armMat.clone());
+      rightArm.position.set(1.8, 5, 0);
+      rightArm.rotation.z = -0.2;
+      group.add(rightArm);
+
+      // Feet peaking from robe
+      const footGeo = new THREE.BoxGeometry(0.6, 0.3, 1.0);
+      const footMat = new THREE.MeshLambertMaterial({ color: 0x8a6a4a });
+      const leftFoot = new THREE.Mesh(footGeo, footMat);
+      leftFoot.position.set(-0.6, 0.15, 0.3);
+      group.add(leftFoot);
+      const rightFoot = new THREE.Mesh(footGeo, footMat.clone());
+      rightFoot.position.set(0.6, 0.15, 0.3);
+      group.add(rightFoot);
+
+      group.scale.setScalar(1.0);
+      return group;
+    }
+
+    // Create 12 apostles with walking paths
+    for (let i = 0; i < 12; i++) {
+      const mesh = createApostleMesh(ROBE_COLORS[i]);
+      // Spread apostles around the field, roughly in pairs
+      const pairIdx = Math.floor(i / 2);
+      const angle = (pairIdx / 6) * Math.PI * 2 + (i % 2) * 0.3;
+      const radius = 40 + pairIdx * 20;
+      const startX = Math.sin(angle) * radius;
+      const startZ = -30 + Math.cos(angle) * radius * 0.6;
+
+      mesh.position.set(startX, 0, startZ);
+      scene.add(mesh);
+
+      // Generate a walking path (circular/meandering)
+      const pathRadius = 15 + Math.random() * 20;
+      const pathCenterX = startX;
+      const pathCenterZ = startZ;
+      const pathSpeed = 0.03 + Math.random() * 0.04;
+      const pathPhase = Math.random() * Math.PI * 2;
+
+      apostles.push({
+        name: APOSTLE_NAMES[i],
+        mesh,
+        pathCenterX,
+        pathCenterZ,
+        pathRadius,
+        pathSpeed,
+        pathPhase,
+        walkPhase: Math.random() * Math.PI * 2,
+      });
+    }
+
+    // ============================================================
+    //  SHEEP — Fluffy flock wandering the heavenly field
+    // ============================================================
+    const sheepList = [];
+    const SHEEP_COUNT = 18;
+
+    function createSheepMesh() {
+      const group = new THREE.Group();
+      const woolMat = new THREE.MeshLambertMaterial({ color: 0xf5f0e8 });
+      const darkMat = new THREE.MeshLambertMaterial({ color: 0x2a2018 });
+      const skinMat = new THREE.MeshLambertMaterial({ color: 0xd8c8b0 });
+
+      // Body — fluffy wool (ellipsoid)
+      const bodyGeo = new THREE.SphereGeometry(1.6, 8, 6);
+      const body = new THREE.Mesh(bodyGeo, woolMat);
+      body.scale.set(1.3, 1.0, 1.0);
+      body.position.set(0, 2.0, 0);
+      group.add(body);
+
+      // Extra wool puffs
+      const puffGeo = new THREE.SphereGeometry(0.7, 6, 5);
+      [[-0.6,2.6,0.5],[0.6,2.6,-0.4],[0,2.7,0],[-0.3,2.4,-0.6],[0.4,2.5,0.5]].forEach(p => {
+        const puff = new THREE.Mesh(puffGeo, woolMat);
+        puff.position.set(p[0], p[1], p[2]);
+        group.add(puff);
+      });
+
+      // Head
+      const headGeo = new THREE.SphereGeometry(0.7, 7, 5);
+      const head = new THREE.Mesh(headGeo, skinMat);
+      head.position.set(0, 2.3, 1.8);
+      group.add(head);
+
+      // Ears
+      const earGeo = new THREE.SphereGeometry(0.25, 5, 4);
+      const earL = new THREE.Mesh(earGeo, skinMat);
+      earL.position.set(-0.55, 2.5, 1.9);
+      earL.scale.set(1, 0.6, 1);
+      group.add(earL);
+      const earR = new THREE.Mesh(earGeo, skinMat);
+      earR.position.set(0.55, 2.5, 1.9);
+      earR.scale.set(1, 0.6, 1);
+      group.add(earR);
+
+      // Eyes
+      const eyeGeo = new THREE.SphereGeometry(0.12, 5, 4);
+      const eyeL = new THREE.Mesh(eyeGeo, darkMat);
+      eyeL.position.set(-0.28, 2.45, 2.35);
+      group.add(eyeL);
+      const eyeR = new THREE.Mesh(eyeGeo, darkMat);
+      eyeR.position.set(0.28, 2.45, 2.35);
+      group.add(eyeR);
+
+      // Nose
+      const noseGeo = new THREE.SphereGeometry(0.15, 5, 4);
+      const nose = new THREE.Mesh(noseGeo, darkMat);
+      nose.position.set(0, 2.15, 2.45);
+      group.add(nose);
+
+      // Legs (4)
+      const legGeo = new THREE.CylinderGeometry(0.18, 0.15, 1.4, 5);
+      const legPositions = [[-0.6,0.7,0.6],[0.6,0.7,0.6],[-0.6,0.7,-0.6],[0.6,0.7,-0.6]];
+      legPositions.forEach(p => {
+        const leg = new THREE.Mesh(legGeo, darkMat);
+        leg.position.set(p[0], p[1], p[2]);
+        group.add(leg);
+      });
+
+      // Tail — small wool puff
+      const tailGeo = new THREE.SphereGeometry(0.35, 5, 4);
+      const tail = new THREE.Mesh(tailGeo, woolMat);
+      tail.position.set(0, 2.2, -1.5);
+      group.add(tail);
+
+      group.scale.setScalar(1.2);
+      return group;
+    }
+
+    for (let i = 0; i < SHEEP_COUNT; i++) {
+      const mesh = createSheepMesh();
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 30 + Math.random() * 120;
+      const startX = Math.sin(angle) * radius;
+      const startZ = -20 + Math.cos(angle) * radius * 0.7;
+      mesh.position.set(startX, 0, startZ);
+      scene.add(mesh);
+
+      const pathRadius = 8 + Math.random() * 18;
+      const pathSpeed = 0.015 + Math.random() * 0.03;
+      const pathPhase = Math.random() * Math.PI * 2;
+
+      sheepList.push({
+        mesh,
+        pathCenterX: startX,
+        pathCenterZ: startZ,
+        pathRadius,
+        pathSpeed,
+        pathPhase,
+        walkPhase: Math.random() * Math.PI * 2,
+      });
+    }
+
+    function updateSheepMovement(elapsed, delta) {
+      for (const s of sheepList) {
+        const t = elapsed * s.pathSpeed + s.pathPhase;
+        const targetX = s.pathCenterX + Math.sin(t) * s.pathRadius;
+        const targetZ = s.pathCenterZ + Math.cos(t) * s.pathRadius;
+
+        s.mesh.position.x += (targetX - s.mesh.position.x) * 1.5 * delta;
+        s.mesh.position.z += (targetZ - s.mesh.position.z) * 1.5 * delta;
+
+        // Face walking direction
+        const dx = targetX - s.mesh.position.x;
+        const dz = targetZ - s.mesh.position.z;
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          s.mesh.rotation.y = Math.atan2(dx, dz);
+        }
+
+        // Walking bob
+        s.walkPhase += delta * 3.5;
+        s.mesh.position.y = Math.abs(Math.sin(s.walkPhase)) * 0.15;
+      }
+    }
+
+    // Apostle conversation system
+    let currentConvIdx = 0;
+    let currentLineIdx = 0;
+    let convTimer = 0;
+    const CONV_INTERVAL = 4.0; // seconds between lines
+    const CONV_PAUSE = 8.0; // pause between conversations
+
+    function showApostleMessage(name, text) {
+      const div = document.createElement('div');
+      div.className = 'apostle-msg';
+      div.innerHTML = `<span class="name">${name}</span><br/>${text}`;
+      apostleChatEl.appendChild(div);
+      // Remove after animation completes
+      setTimeout(() => { if (div.parentNode) div.parentNode.removeChild(div); }, 6500);
+      // Keep max 3 messages visible
+      while (apostleChatEl.children.length > 3) {
+        apostleChatEl.removeChild(apostleChatEl.firstChild);
+      }
+    }
+
+    function updateApostleConversations(delta) {
+      convTimer += delta;
+      const conv = APOSTLE_CONVERSATIONS[currentConvIdx];
+      if (!conv) return;
+
+      const threshold = currentLineIdx >= conv.lines.length ? CONV_PAUSE : CONV_INTERVAL;
+      if (convTimer >= threshold) {
+        convTimer = 0;
+        if (currentLineIdx < conv.lines.length) {
+          const line = conv.lines[currentLineIdx];
+          showApostleMessage(APOSTLE_NAMES[line.who], line.text);
+          currentLineIdx++;
+        } else {
+          // Move to next conversation
+          currentLineIdx = 0;
+          currentConvIdx = (currentConvIdx + 1) % APOSTLE_CONVERSATIONS.length;
+        }
+      }
+    }
+
+    function updateApostleMovement(elapsed, delta) {
+      for (const ap of apostles) {
+        // Circular walking path
+        const t = elapsed * ap.pathSpeed + ap.pathPhase;
+        const targetX = ap.pathCenterX + Math.sin(t) * ap.pathRadius;
+        const targetZ = ap.pathCenterZ + Math.cos(t) * ap.pathRadius;
+
+        // Smooth movement
+        ap.mesh.position.x += (targetX - ap.mesh.position.x) * 2.0 * delta;
+        ap.mesh.position.z += (targetZ - ap.mesh.position.z) * 2.0 * delta;
+        ap.mesh.position.y = 0; // Stay on ground
+
+        // Face walking direction
+        const dx = targetX - ap.mesh.position.x;
+        const dz = targetZ - ap.mesh.position.z;
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          ap.mesh.rotation.y = Math.atan2(dx, dz);
+        }
+
+        // Walking bob animation
+        ap.walkPhase += delta * 4.0;
+        ap.mesh.position.y = Math.abs(Math.sin(ap.walkPhase)) * 0.3;
+      }
+    }
+
+    // ============================================================
+    //  POINTER LOCK
+    // ============================================================
+    blocker.addEventListener('click', () => {
+      renderer.domElement.requestPointerLock();
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      isLocked = document.pointerLockElement === renderer.domElement;
+      // Only show blocker if we lost pointer lock while document is still focused (not tab switching)
+      if (isLocked) {
+        blocker.classList.add('hidden');
+        crosshair.style.display = 'block';
+      } else if (document.hasFocus()) {
+        blocker.classList.remove('hidden');
+        crosshair.style.display = 'none';
+      }
+    });
+
+    // Handle page visibility changes (tab switching)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !isLocked && document.hasFocus()) {
+        // When returning to the tab and pointer lock is lost, keep game running without blocker
+        blocker.classList.add('hidden');
+        crosshair.style.display = 'block';
+      }
+    });
+
+    // Handle window focus/blur events
+    window.addEventListener('blur', () => {
+      // When window loses focus, don't show blocker
+      // This prevents popup when switching tabs
+    });
+
+    window.addEventListener('focus', () => {
+      // When window regains focus, if we were playing, continue without blocker
+      if (!isLocked) {
+        blocker.classList.add('hidden');
+        crosshair.style.display = 'block';
+      }
+    });
+
+    // ============================================================
+    //  MOUSE LOOK
+    // ============================================================
+    document.addEventListener('mousemove', (e) => {
+      if (!isLocked) return;
+      euler.setFromQuaternion(camera.quaternion);
+      euler.y -= e.movementX * MOUSE_SENSITIVITY;
+      euler.x -= e.movementY * MOUSE_SENSITIVITY;
+      euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, euler.x));
+      camera.quaternion.setFromEuler(euler);
+    });
+
+    // ============================================================
+    //  KEYBOARD
+    // ============================================================
+    document.addEventListener('keydown', (e) => {
+      switch (e.code) {
+        case 'KeyW': moveState.forward = true; break;
+        case 'KeyS': moveState.backward = true; break;
+        case 'KeyA': moveState.left = true; break;
+        case 'KeyD': moveState.right = true; break;
+        case 'Space': e.preventDefault(); moveState.flyUp = true; break;
+        case 'ShiftLeft': case 'ShiftRight': moveState.flyDown = true; break;
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      switch (e.code) {
+        case 'KeyW': moveState.forward = false; break;
+        case 'KeyS': moveState.backward = false; break;
+        case 'KeyA': moveState.left = false; break;
+        case 'KeyD': moveState.right = false; break;
+        case 'Space': moveState.flyUp = false; break;
+        case 'ShiftLeft': case 'ShiftRight': moveState.flyDown = false; break;
+      }
+    });
+
+    // ============================================================
+    //  LLM INTEGRATION
+    // ============================================================
+    async function queryLLM(userMessage) {
+      if (CONFIG.OPENAI_API_KEY) {
+        return await queryOpenAI(userMessage);
+      } else {
+        return getFallbackResponse(userMessage);
+      }
+    }
+
+    async function queryOpenAI(userMessage) {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CONFIG.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: CONFIG.OPENAI_MODEL,
+          messages: [
+            { role: 'system', content: CONFIG.SYSTEM_PROMPT },
+            { role: 'user', content: userMessage },
+          ],
+          max_tokens: 200,
+          temperature: 0.8,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      return data.choices[0].message.content;
+    }
+
+    function getFallbackResponse(userMessage) {
+      const responses = [
+        'Peace be upon you, child. The answers you seek lie within your own heart.',
+        'Walk forward in faith, and the path shall reveal itself.',
+        'Every question carries its own answer, like a seed carries the tree.',
+        'Be still, and know. The silence between words holds more truth than a thousand sermons.',
+        'You have come far across this field to ask. That journey itself is the answer.',
+        'The fog clears not through force, but through patience and grace.',
+      ];
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    // ============================================================
+    //  TTS — speak() function with ElevenLabs + Web Speech fallback
+    // ============================================================
+
+    // Current audio reference for cleanup
+    let currentAudio = null;
+
+    /**
+     * speak(text, onSubtitleStart, onSubtitleEnd)
+     *
+     * Core TTS function. Sends text to ElevenLabs (eleven_multilingual_v2),
+     * plays the returned audio via ArrayBuffer → AudioContext for lowest
+     * latency, and fires subtitle callbacks for display sync.
+     *
+     * Falls back to Web Speech API if ElevenLabs is unavailable.
+     *
+     * @param {string}   text             — The text to speak
+     * @param {function} onSubtitleStart  — Called when audio begins (receives text)
+     * @param {function} onSubtitleEnd    — Called when audio finishes
+     * @returns {Promise<void>}
+     */
+    async function speak(text, onSubtitleStart = null, onSubtitleEnd = null) {
+      console.log('[TTS] Provider:', CONFIG.TTS_PROVIDER);
+      console.log('[TTS] Has ElevenLabs key:', !!CONFIG.ELEVENLABS_API_KEY);
+      console.log('[TTS] Voice ID:', CONFIG.ELEVENLABS_VOICE_ID);
+      
+      if (CONFIG.TTS_PROVIDER === 'elevenlabs' && CONFIG.ELEVENLABS_API_KEY) {
+        await speakElevenLabs(text, onSubtitleStart, onSubtitleEnd);
+      } else {
+        console.warn('[TTS] Falling back to browser TTS');
+        await speakBrowser(text, onSubtitleStart, onSubtitleEnd);
+      }
+    }
+
+    /**
+     * ElevenLabs TTS — eleven_multilingual_v2
+     * Uses ArrayBuffer + AudioContext for efficient binary handling
+     */
+    async function speakElevenLabs(text, onSubtitleStart, onSubtitleEnd) {
+      const url = `https://api.elevenlabs.io/v1/text-to-speech/${CONFIG.ELEVENLABS_VOICE_ID}`;
+
+      try {
+        console.log('[TTS] Attempting ElevenLabs with voice ID:', CONFIG.ELEVENLABS_VOICE_ID);
+        console.log('[TTS] API key format:', CONFIG.ELEVENLABS_API_KEY ? `${CONFIG.ELEVENLABS_API_KEY.substring(0, 8)}...` : 'MISSING');
+        
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': CONFIG.ELEVENLABS_API_KEY,
+          },
+          body: JSON.stringify({
+            text,
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+              style: 0.4,
+              use_speaker_boost: true,
+            },
+          }),
+        });
+
+        if (!res.ok) {
+          const errBody = await res.text();
+          console.error('[TTS] ElevenLabs API Response:', errBody);
+          throw new Error(`ElevenLabs API ${res.status}: ${errBody}`);
+        }
+
+        // ArrayBuffer for efficient binary handling
+        const arrayBuffer = await res.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+        // Fire subtitle start callback
+        if (onSubtitleStart) onSubtitleStart(text);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // Lip sync: route audio through an AnalyserNode
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.4;
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        lipSyncAnalyser = analyser;
+        lipSyncDataArray = new Uint8Array(analyser.frequencyBinCount);
+        lipSyncActive = true;
+
+        await new Promise((resolve) => {
+          source.onended = () => {
+            lipSyncActive = false;
+            lipSyncAnalyser = null;
+            if (onSubtitleEnd) onSubtitleEnd();
+            audioCtx.close();
+            resolve();
+          };
+          source.start(0);
+        });
+
+      } catch (err) {
+        lipSyncActive = false;
+        lipSyncAnalyser = null;
+        console.error('[TTS] ElevenLabs error:', err);
+        console.warn('[TTS] Falling back to Web Speech API');
+        await speakBrowser(text, onSubtitleStart, onSubtitleEnd);
+      }
+    }
+
+    /**
+     * Web Speech API fallback
+     */
+    function speakBrowser(text, onSubtitleStart, onSubtitleEnd) {
+      return new Promise((resolve) => {
+        if (!('speechSynthesis' in window)) {
+          if (onSubtitleStart) onSubtitleStart(text);
+          fakeLipSyncActive = true;
+          fakeLipSyncStart = Date.now();
+          setTimeout(() => { fakeLipSyncActive = false; if (onSubtitleEnd) onSubtitleEnd(); resolve(); }, 3000);
+          return;
+        }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.85;
+        utterance.pitch = 0.8;
+        utterance.volume = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find(v =>
+          v.name.includes('Daniel') || v.name.includes('Male') || v.name.includes('Google UK English Male')
+        );
+        if (preferred) utterance.voice = preferred;
+
+        utterance.onstart = () => { if (onSubtitleStart) onSubtitleStart(text); fakeLipSyncActive = true; fakeLipSyncStart = Date.now(); };
+        utterance.onend = () => { fakeLipSyncActive = false; if (onSubtitleEnd) onSubtitleEnd(); resolve(); };
+        utterance.onerror = () => { fakeLipSyncActive = false; if (onSubtitleEnd) onSubtitleEnd(); resolve(); };
+        window.speechSynthesis.speak(utterance);
+      });
+    }
+
+    /**
+     * speakResponse — wrapper used by the dialogue system.
+     * Wires speak() to the subtitle UI.
+     */
+    async function speakResponse(text) {
+      await speak(
+        text,
+        (t) => showSubtitles(t),   // onSubtitleStart
+        () => {}                    // onSubtitleEnd — subtitles auto-hide via timer
+      );
+    }
+
+    // ============================================================
+    //  SUBTITLES
+    // ============================================================
+    let subtitleTimeout;
+    function showSubtitles(text) {
+      clearTimeout(subtitleTimeout);
+      subtitleText.textContent = text;
+      subtitlesEl.classList.remove('hidden');
+      subtitleTimeout = setTimeout(() => {
+        subtitlesEl.classList.add('hidden');
+      }, Math.max(5000, text.length * 80));
+    }
+
+    // ============================================================
+    //  LIP SYNC — drive mouth from audio analyser or fake simulation
+    // ============================================================
+    function updateLipSync(delta) {
+      let targetOpen = 0;
+
+      if (lipSyncActive && lipSyncAnalyser && lipSyncDataArray) {
+        // Real audio analysis — voice-frequency bins
+        lipSyncAnalyser.getByteFrequencyData(lipSyncDataArray);
+        let sum = 0;
+        const count = Math.min(32, lipSyncDataArray.length);
+        for (let i = 0; i < count; i++) sum += lipSyncDataArray[i];
+        const avg = sum / count;
+        targetOpen = Math.min(1.0, avg / 120);
+      } else if (fakeLipSyncActive) {
+        // Procedural talking simulation — varied small movements
+        const t = (Date.now() - fakeLipSyncStart) / 1000;
+        targetOpen = Math.abs(Math.sin(t * 7.5)) * 0.3
+                   + Math.abs(Math.sin(t * 12.3)) * 0.2
+                   + Math.abs(Math.sin(t * 4.1)) * 0.15;
+        // Add brief pauses to mimic natural speech rhythm
+        const pause = Math.sin(t * 2.0);
+        if (pause < -0.6) targetOpen *= 0.1;
+        targetOpen = Math.min(0.7, targetOpen);
+      }
+
+      // Smooth toward target
+      mouthOpenAmount += (targetOpen - mouthOpenAmount) * Math.min(1, delta * 18);
+
+      // Apply — morph target
+      if (lipSyncMorphMesh && lipSyncMorphIndex !== null) {
+        lipSyncMorphMesh.morphTargetInfluences[lipSyncMorphIndex] = mouthOpenAmount;
+      }
+      // Apply — jaw bone (very subtle rotation to avoid mesh tearing)
+      if (lipSyncJawBone) {
+        lipSyncJawBone.rotation.x = lipSyncJawRestX + mouthOpenAmount * 0.08;
+      }
+      // Apply — procedural mouth
+      if (lipSyncProceduralMouth) {
+        lipSyncProceduralMouth.scale.y = 0.01 + mouthOpenAmount * 1.0;
+        lipSyncProceduralMouth.material.opacity = mouthOpenAmount > 0.05 ? 0.9 : 0.0;
+      }
+    }
+
+    // ============================================================
+    //  RENDER LOOP
+    // ============================================================
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // --- Movement ---
+      if (isLocked) {
+        direction.set(0, 0, 0);
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+        forward.y = 0;
+        forward.normalize();
+        const right = new THREE.Vector3();
+        right.crossVectors(forward, camera.up).normalize();
+
+        if (moveState.forward)  direction.add(forward);
+        if (moveState.backward) direction.sub(forward);
+        if (moveState.left)     direction.sub(right);
+        if (moveState.right)    direction.add(right);
+        direction.normalize();
+
+        velocity.lerp(direction.multiplyScalar(MOVE_SPEED), 0.1);
+        camera.position.add(velocity.clone().multiplyScalar(delta));
+
+        // Vertical flight
+        if (moveState.flyUp)   camera.position.y += FLY_SPEED * delta;
+        if (moveState.flyDown) camera.position.y -= FLY_SPEED * delta;
+        camera.position.y = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, camera.position.y));
+      } else {
+        velocity.set(0, 0, 0);
+      }
+
+      // --- 3D Jesus: gently rotate to face camera ---
+      if (figureMesh) {
+        const dx = camera.position.x - figureMesh.position.x;
+        const dz = camera.position.z - figureMesh.position.z;
+        const targetAngle = Math.atan2(dx, dz);
+        // Smooth rotation toward camera
+        let diff = targetAngle - figureMesh.rotation.y;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        figureMesh.rotation.y += diff * 2.0 * delta;
+      }
+
+      // --- Update GLB animation mixer ---
+      if (jesusAnimMixer) jesusAnimMixer.update(delta);
+
+      // --- Lip sync ---
+      updateLipSync(delta);
+
+      // --- HUD distance ---
+      const dist = camera.position.distanceTo(figurePosition);
+      hudDistance.textContent = `${Math.round(dist)}m`;
+
+      // --- Animate sky ---
+      skyMat.uniforms.uTime.value = elapsed;
+
+      // --- Animate particles ---
+      const posArr = particles.geometry.attributes.position.array;
+      for (let i = 0; i < particleCount; i++) {
+        posArr[i * 3 + 1] += Math.sin(elapsed * 0.3 + i) * 0.02;
+        posArr[i * 3]     += Math.cos(elapsed * 0.15 + i * 0.5) * 0.01;
+      }
+      particles.geometry.attributes.position.needsUpdate = true;
+
+      // --- Divine light pulse ---
+      divineLight.intensity = 3.0 + Math.sin(elapsed * 0.5) * 0.8;
+      haloLight.intensity = 4.0 + Math.sin(elapsed * 0.3) * 1.0;
+      haloRimLight.intensity = 2.5 + Math.cos(elapsed * 0.4) * 0.6;
+      heavenGlow1.intensity = 1.5 + Math.sin(elapsed * 0.3 + 1.0) * 0.3;
+      heavenGlow2.intensity = 1.2 + Math.cos(elapsed * 0.4) * 0.2;
+
+      // --- Animate halo elements ---
+      if (haloGroup.children.length > 0) {
+        const haloPulse = 0.9 + Math.sin(elapsed * 0.6) * 0.1;
+        if (haloGroup.children[0]) haloGroup.children[0].material.opacity = 0.7 * haloPulse;
+        if (haloGroup.children[1]) haloGroup.children[1].material.opacity = 0.35 * haloPulse;
+
+        haloGroup.children.forEach(child => {
+          child.lookAt(camera.position.x, child.position.y, camera.position.z);
+        });
+      }
+
+      // --- Apostles: movement + conversations ---
+      updateApostleMovement(elapsed, delta);
+      updateApostleConversations(delta);
+
+      // --- Sheep movement ---
+      updateSheepMovement(elapsed, delta);
+
+      // --- Animate clouds: gentle bobbing ---
+      for (const cloud of cloudGroup.children) {
+        cloud.position.y = cloud.userData.baseY + Math.sin(elapsed * 0.3 + cloud.userData.phase) * 1.5;
+      }
+
+      // --- Ground glow follows player ---
+      groundGlow.position.x = camera.position.x;
+      groundGlow.position.z = camera.position.z;
+
+      // --- Fog plane subtle sway ---
+      fogPlane.position.y = 3 + Math.sin(elapsed * 0.2) * 0.5;
+      fogPlane2.position.y = 8 + Math.cos(elapsed * 0.15) * 0.8;
+
+      renderer.render(scene, camera);
+    }
+
+    // ============================================================
+    //  RESIZE
+    // ============================================================
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Preload voices for Web Speech API
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
+    animate();
+
+    // ============================================================
+    //  PUMP.FUN BACKEND WEBSOCKET CLIENT
+    // ============================================================
+    const pfMessagesEl = document.getElementById('pumpfun-messages');
+    const pfStatusEl   = document.getElementById('pumpfun-status');
+    let backendWs = null;
+
+    function connectToBackend() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const url   = `${proto}//${location.host}`;
+
+      backendWs = new WebSocket(url);
+
+      backendWs.onopen = () => {
+        console.log('[BACKEND] Connected');
+        pfStatusEl.textContent = '✦ Connected — displaying Pump.fun questions';
+        pfStatusEl.style.color = '#86efac';
+      };
+
+      backendWs.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (data.type === 'jesus_response') {
+            addPumpFunResponse(data);
+          }
+        } catch (_) { /* ignore non-JSON */ }
+      };
+
+      backendWs.onerror = () => {
+        pfStatusEl.textContent = '⚠ Connection error';
+        pfStatusEl.style.color = '#fca5a5';
+      };
+
+      backendWs.onclose = () => {
+        pfStatusEl.textContent = '↻ Reconnecting…';
+        pfStatusEl.style.color = '#fbbf24';
+        setTimeout(connectToBackend, 3000);
+      };
+    }
+
+    function addPumpFunResponse(data) {
+      const div = document.createElement('div');
+      div.className = 'pf-msg';
+
+      const safeUser = escHtml(data.username);
+      const safeQ    = escHtml(data.question);
+      const safeA    = escHtml(data.response);
+
+      div.innerHTML =
+        `<div class="pf-user">${safeUser}</div>` +
+        `<div class="pf-q">${safeQ}</div>` +
+        `<div class="pf-a">✝ ${safeA}</div>`;
+
+      pfMessagesEl.insertBefore(div, pfMessagesEl.firstChild);
+
+      // Cap visible messages
+      while (pfMessagesEl.children.length > 20) {
+        pfMessagesEl.removeChild(pfMessagesEl.lastChild);
+      }
+
+      // Always speak the response aloud
+      speakResponse(data.response).catch(() => {});
+    }
+
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    connectToBackend();
+  </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TTS Debug</title>
+</head>
+<body>
+    <h1>ElevenLabs Debug</h1>
+    <button onclick="testWithFreeVoice()">Test with Free Voice</button>
+    <button onclick="testWithYourVoice()">Test with Your Voice</button>
+    <div id="status"></div>
+    
+    <script>
+        async function loadConfig() {
+            const response = await fetch('/api/config');
+            return await response.json();
+        }
+        
+        async function testWithFreeVoice() {
+            await testVoice('rachel', 'Testing with free Rachel voice');
+        }
+        
+        async function testWithYourVoice() {
+            const CONFIG = await loadConfig();
+            await testVoice(CONFIG.ELEVENLABS_VOICE_ID, 'Testing with your configured voice');
+        }
+        
+        async function testVoice(voiceId, text) {
+            const status = document.getElementById('status');
+            status.innerHTML = `Testing with voice: ${voiceId}...`;
+            
+            try {
+                const CONFIG = await loadConfig();
+                
+                const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'xi-api-key': CONFIG.ELEVENLABS_API_KEY,
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        model_id: 'eleven_multilingual_v2',
+                    }),
+                });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    status.innerHTML = `❌ Error with ${voiceId}: ${error}`;
+                    console.error('Error:', error);
+                    return;
+                }
+                
+                const audioBuffer = await response.arrayBuffer();
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const audio = await audioCtx.decodeAudioData(audioBuffer);
+                
+                const source = audioCtx.createBufferSource();
+                source.buffer = audio;
+                source.connect(audioCtx.destination);
+                source.start();
+                
+                status.innerHTML = `✅ Voice ${voiceId} working!`;
+                
+            } catch (error) {
+                status.innerHTML = `❌ Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
