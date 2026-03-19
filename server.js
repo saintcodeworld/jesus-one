@@ -29,6 +29,9 @@ const CONFIG = {
   GLOBAL_RATE_LIMIT: parseInt(process.env.GLOBAL_RATE_LIMIT) || 10,
   GLOBAL_RATE_WINDOW_MS: parseInt(process.env.GLOBAL_RATE_WINDOW_MINUTES || 5) * 60 * 1000,
 
+  // Admin
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin999',
+
   // Trigger prefix (case-insensitive)
   TRIGGER_PREFIX: 'jesus',
 
@@ -287,10 +290,19 @@ app.get('/admin', (req, res) => {
 // ADMIN QUESTION ENDPOINT
 // ============================================================
 app.post('/api/admin-question', async (req, res) => {
-  const { username, question } = req.body;
+  const { username, question, password } = req.body;
+  
+  if (password !== CONFIG.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
   
   if (!question) {
     return res.status(400).json({ error: 'Question required' });
+  }
+  
+  // Auth check only — don't process further
+  if (question === '__auth_check__') {
+    return res.json({ success: true, authCheck: true });
   }
   
   const user = username || 'Admin';

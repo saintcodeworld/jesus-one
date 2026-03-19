@@ -40,7 +40,34 @@
   </style>
 </head>
 <body class="flex items-center justify-center p-4">
-  <div class="max-w-2xl w-full">
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="max-w-md w-full">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-amber-300 mb-2 tracking-wider">Admin Login</h1>
+      <p class="text-amber-200/70 text-lg">Enter password to continue</p>
+    </div>
+    <div class="bg-black/40 backdrop-blur-lg rounded-2xl p-8 border border-amber-500/20 holy-glow">
+      <form id="login-form" class="space-y-6">
+        <div>
+          <label for="admin-password" class="block text-amber-300/80 text-sm font-medium mb-2">Password</label>
+          <input
+            type="password"
+            id="admin-password"
+            placeholder="Enter admin password..."
+            class="w-full px-4 py-3 rounded-lg text-amber-100 placeholder-amber-400/40 divine-input outline-none"
+            required
+            autofocus
+          />
+        </div>
+        <div id="login-error" class="hidden text-red-400 text-sm"></div>
+        <button type="submit" class="w-full holy-button text-white font-semibold py-3 px-6 rounded-lg">Enter</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Panel (hidden until login) -->
+  <div id="admin-panel" class="max-w-2xl w-full" style="display:none;">
     <!-- Header -->
     <div class="text-center mb-8">
       <h1 class="text-4xl font-bold text-amber-300 mb-2 tracking-wider">Admin Panel</h1>
@@ -144,6 +171,46 @@
 
     // State
     let recentQuestionsList = [];
+    let adminPassword = '';
+
+    // Login
+    const loginScreen = document.getElementById('login-screen');
+    const adminPanel = document.getElementById('admin-panel');
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+    const passwordInput = document.getElementById('admin-password');
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pw = passwordInput.value.trim();
+      if (!pw) return;
+
+      // Verify password with a test request
+      try {
+        const res = await fetch('/api/admin-question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw, question: '__auth_check__', username: 'auth' }),
+        });
+        if (res.status === 401) {
+          loginError.textContent = 'Wrong password. Try again.';
+          loginError.classList.remove('hidden');
+          passwordInput.value = '';
+          passwordInput.focus();
+          return;
+        }
+      } catch (err) {
+        loginError.textContent = 'Cannot reach server.';
+        loginError.classList.remove('hidden');
+        return;
+      }
+
+      adminPassword = pw;
+      loginScreen.style.display = 'none';
+      adminPanel.style.display = 'block';
+      checkConnection();
+      usernameInput.focus();
+    });
 
     // Check connection
     async function checkConnection() {
@@ -227,7 +294,7 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ username, question }),
+          body: JSON.stringify({ username, question, password: adminPassword }),
         });
 
         const data = await response.json();
